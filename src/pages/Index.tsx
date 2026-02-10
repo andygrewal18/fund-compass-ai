@@ -4,6 +4,8 @@ import HeroSection from "@/components/HeroSection";
 import ScoreCards from "@/components/ScoreCards";
 import FundComparisonTable from "@/components/FundComparisonTable";
 import ChatBot from "@/components/ChatBot";
+import Nifty50Stocks from "@/components/Nifty50Stocks";
+
 
 const Index = () => {
   return (
@@ -12,6 +14,7 @@ const Index = () => {
       <MarketTicker />
       <HeroSection />
       <ScoreCards />
+      <Nifty50Stocks />
       <FundComparisonTable />
       <ChatBot />
     </div>

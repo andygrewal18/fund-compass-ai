@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { fundsData, Fund, getRiskColor, getScoreLabel, getScoreColor } from "@/data/fundData";
 import InvestmentScoreRing from "./InvestmentScoreRing";
-import { Star, ArrowUpDown, ArrowUp, ArrowDown, Heart } from "lucide-react";
+import FundDetailModal from "./FundDetailModal";
+import { Star, ArrowUpDown, ArrowUp, ArrowDown, Heart, Maximize2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 
@@ -14,6 +15,13 @@ const FundComparisonTable = () => {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const { user } = useAuth();
   const { favorites, toggleFavorite } = useFavorites();
+  const [selectedFund, setSelectedFund] = useState<Fund | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleRowClick = (fund: Fund) => {
+    setSelectedFund(fund);
+    setIsModalOpen(true);
+  };
 
   const categories = ["All", ...new Set(fundsData.map((f) => f.category))];
 
@@ -55,6 +63,7 @@ const FundComparisonTable = () => {
     { key: "expenseRatio" as SortKey, label: "Expense %" },
     { key: "rating" as SortKey, label: "Rating" },
     { key: "aum" as SortKey, label: "AUM (Cr)" },
+    { key: "" as SortKey, label: "" },
   ];
 
   return (
@@ -70,11 +79,10 @@ const FundComparisonTable = () => {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                  selectedCategory === cat
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${selectedCategory === cat
                     ? "bg-primary text-primary-foreground"
                     : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                }`}
+                  }`}
               >
                 {cat}
               </button>
@@ -90,9 +98,8 @@ const FundComparisonTable = () => {
                   {columns.map(({ key, label }) => (
                     <th
                       key={key || "fav"}
-                      className={`text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider ${
-                        key ? "cursor-pointer hover:text-foreground" : ""
-                      } transition-colors select-none`}
+                      className={`text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider ${key ? "cursor-pointer hover:text-foreground" : ""
+                        } transition-colors select-none`}
                       onClick={() => key && toggleSort(key)}
                     >
                       <span className="inline-flex items-center gap-1">
@@ -106,18 +113,24 @@ const FundComparisonTable = () => {
                 {sorted.map((fund, i) => (
                   <tr
                     key={fund.id}
-                    className="border-b border-border/50 hover:bg-secondary/30 transition-colors animate-fade-in"
+                    className="border-b border-border/50 hover:bg-secondary/30 transition-colors animate-fade-in group cursor-pointer"
                     style={{ animationDelay: `${i * 50}ms` }}
+                    onClick={() => handleRowClick(fund)}
                   >
                     {user && (
                       <td className="px-4 py-4">
-                        <button onClick={() => toggleFavorite(fund.id)} className="hover:scale-110 transition-transform">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(fund.id);
+                          }}
+                          className="hover:scale-110 transition-transform"
+                        >
                           <Heart
-                            className={`w-4 h-4 transition-colors ${
-                              favorites.has(fund.id)
+                            className={`w-4 h-4 transition-colors ${favorites.has(fund.id)
                                 ? "text-destructive fill-destructive"
                                 : "text-muted-foreground hover:text-destructive"
-                            }`}
+                              }`}
                           />
                         </button>
                       </td>
@@ -164,15 +177,14 @@ const FundComparisonTable = () => {
                         {Array.from({ length: 5 }).map((_, j) => (
                           <Star
                             key={j}
-                            className={`w-3.5 h-3.5 ${
-                              j < fund.rating ? "text-chart-warning fill-chart-warning" : "text-border"
-                            }`}
+                            className={`w-3.5 h-3.5 ${j < fund.rating ? "text-chart-warning fill-chart-warning" : "text-border"
+                              }`}
                           />
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-4">
-                      <span className="font-mono text-foreground">₹{(fund.aum).toLocaleString("en-IN")}</span>
+                    <td className="px-4 py-4 text-right">
+                      <Maximize2 className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </td>
                   </tr>
                 ))}
@@ -180,6 +192,12 @@ const FundComparisonTable = () => {
             </table>
           </div>
         </div>
+
+        <FundDetailModal
+          fund={selectedFund}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+        />
       </div>
     </section>
   );
