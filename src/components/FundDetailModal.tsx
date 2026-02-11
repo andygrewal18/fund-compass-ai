@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
     Dialog,
     DialogContent,
@@ -10,6 +10,32 @@ import { Fund, getRiskColor, getScoreColor, getScoreLabel } from "@/data/fundDat
 import InvestmentScoreRing from "./InvestmentScoreRing";
 import SIPCalculator from "./SIPCalculator";
 import { TrendingUp, Shield, BarChart3, Info, Wallet, PieChart } from "lucide-react";
+import {
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+} from "recharts";
+
+function generateFundHistory(returns1Y: number, returns3Y: number, returns5Y: number) {
+    const data: { year: string; value: number }[] = [];
+    let nav = 100;
+    const annualReturns = [
+        returns5Y * 0.8, returns5Y * 1.1, returns5Y * 0.9,
+        returns3Y * 0.95, returns3Y * 1.05,
+        returns1Y,
+    ];
+    const startYear = new Date().getFullYear() - 5;
+    data.push({ year: `${startYear}`, value: Math.round(nav * 100) / 100 });
+    for (let i = 0; i < 6; i++) {
+        nav = nav * (1 + annualReturns[i] / 100);
+        data.push({ year: `${startYear + i + 1}`, value: Math.round(nav * 100) / 100 });
+    }
+    return data;
+}
 
 interface FundDetailModalProps {
     fund: Fund | null;
@@ -18,6 +44,10 @@ interface FundDetailModalProps {
 }
 
 const FundDetailModal = ({ fund, isOpen, onClose }: FundDetailModalProps) => {
+    const chartData = useMemo(
+        () => fund ? generateFundHistory(fund.returns1Y, fund.returns3Y, fund.returns5Y) : [],
+        [fund?.id]
+    );
     if (!fund) return null;
 
     return (
@@ -79,6 +109,29 @@ const FundDetailModal = ({ fund, isOpen, onClose }: FundDetailModalProps) => {
                                     <p className="text-sm font-mono font-bold text-chart-positive">+{fund.returns5Y}%</p>
                                 </div>
                             </div>
+                            {/* Growth chart */}
+                            <div className="h-48 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="fundGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="hsl(160, 60%, 45%)" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="hsl(160, 60%, 45%)" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 14%, 18%)" />
+                                        <XAxis dataKey="year" tick={{ fontSize: 10, fill: "hsl(215, 12%, 55%)" }} tickLine={false} axisLine={false} />
+                                        <YAxis tick={{ fontSize: 10, fill: "hsl(215, 12%, 55%)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v}`} />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: "hsl(220, 18%, 12%)", border: "1px solid hsl(220, 14%, 22%)", borderRadius: "0.5rem", fontSize: "12px" }}
+                                            labelStyle={{ color: "hsl(215, 12%, 55%)" }}
+                                            formatter={(value: number) => [`₹${value.toFixed(2)}`, "₹100 invested"]}
+                                        />
+                                        <Area type="monotone" dataKey="value" stroke="hsl(160, 60%, 45%)" strokeWidth={2} fill="url(#fundGrad)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground text-center">Growth of ₹100 invested 5 years ago (simulated)</p>
                         </div>
 
                         <div className="space-y-4">
