@@ -5,32 +5,39 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// AMFI scheme codes mapped to our fund IDs
-const FUNDS = [
-  { id: "1", code: "120503" },   // Axis Bluechip Fund
-  { id: "2", code: "118834" },   // Mirae Asset Large Cap
-  { id: "3", code: "125497" },   // SBI Small Cap
-  { id: "4", code: "118989" },   // HDFC Mid-Cap Opportunities
-  { id: "5", code: "122639" },   // Parag Parikh Flexi Cap
-  { id: "6", code: "120242" },   // ICICI Pru Balanced Advantage
-  { id: "7", code: "120505" },   // Kotak Emerging Equity
-  { id: "8", code: "118668" },   // Nippon India Growth
-  { id: "9", code: "148748" },   // Nippon India Multi Cap
-  { id: "10", code: "120823" },  // Quant Active
-  { id: "11", code: "147611" },  // Mahindra Manulife Multi Cap
-  { id: "12", code: "149870" },  // HDFC Multi Cap
-  { id: "13", code: "119212" },  // HDFC Balanced Advantage
-  { id: "14", code: "118550" },  // HDFC Flexi Cap
+// Fund names as they appear in AMFI data (Direct Plan - Growth variants)
+const FUNDS: { id: string; searchTerms: string[] }[] = [
+  { id: "1", searchTerms: ["Axis Bluechip", "Direct", "Growth"] },
+  { id: "2", searchTerms: ["Mirae Asset Large Cap Fund", "Direct", "Growth"] },
+  { id: "3", searchTerms: ["SBI Small Cap Fund", "Direct", "Growth"] },
+  { id: "4", searchTerms: ["HDFC Mid Cap Fund", "Direct", "Growth"] },      // was "HDFC Mid-Cap Opportunities"
+  { id: "5", searchTerms: ["Parag Parikh Flexi Cap Fund", "Direct", "Growth"] },
+  { id: "6", searchTerms: ["ICICI Prudential Balanced Advantage Fund", "Direct", "Growth"] },
+  { id: "7", searchTerms: ["Kotak Midcap Fund", "Direct", "Growth"] },       // was "Kotak Emerging Equity"
+  { id: "8", searchTerms: ["Nippon India Growth Mid Cap Fund", "Direct", "Growth"] },
+  { id: "9", searchTerms: ["Nippon India Multi Cap Fund", "Direct", "Growth"] },
+  { id: "10", searchTerms: ["quant Multi Cap Fund", "Direct", "GROWTH"] },   // was "Quant Active Fund"
+  { id: "11", searchTerms: ["Mahindra Manulife Multi Cap Fund", "Direct", "Growth"] },
+  { id: "12", searchTerms: ["HDFC Multi Cap Fund", "Direct", "Growth"] },
+  { id: "13", searchTerms: ["HDFC Balanced Advantage Fund", "Direct", "Growth"] },
+  { id: "14", searchTerms: ["HDFC Flexi Cap Fund", "Direct", "Growth"] },
 ];
 
-async function fetchNav(code: string) {
-  const url = `https://api.mfapi.in/mf/${code}/latest`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const data = await res.json();
-  const latest = data?.data?.[0];
-  if (!latest) return null;
-  return parseFloat(latest.nav);
+function findNav(lines: string[], searchTerms: string[]): number | null {
+  for (const line of lines) {
+    const upper = line.toUpperCase();
+    const allMatch = searchTerms.every((term) => upper.includes(term.toUpperCase()));
+    // Exclude IDCW/Dividend lines
+    if (allMatch && !upper.includes("IDCW") && !upper.includes("DIVIDEND") && !upper.includes("BONUS")) {
+      const parts = line.split(";");
+      // Format: SchemeCode;ISIN;ISIN2;SchemeName;NAV;Date
+      if (parts.length >= 5) {
+        const nav = parseFloat(parts[4]);
+        if (!isNaN(nav) && nav > 0) return nav;
+      }
+    }
+  }
+  return null;
 }
 
 serve(async (req) => {
@@ -39,17 +46,19 @@ serve(async (req) => {
   }
 
   try {
-    const results = await Promise.allSettled(
-      FUNDS.map(async (f) => {
-        const nav = await fetchNav(f.code);
-        return { id: f.id, nav };
-      })
-    );
+    // Fetch the full AMFI NAV file (updated multiple times daily)
+    const res = await fetch("https://portal.amfiindia.com/spages/NAVOpen.txt");
+    if (!res.ok) {
+      throw new Error(`AMFI API returned ${res.status}`);
+    }
+    const text = await res.text();
+    const lines = text.split("\n");
 
     const funds: Record<string, number> = {};
-    for (const r of results) {
-      if (r.status === "fulfilled" && r.value.nav !== null) {
-        funds[r.value.id] = r.value.nav;
+    for (const fund of FUNDS) {
+      const nav = findNav(lines, fund.searchTerms);
+      if (nav !== null) {
+        funds[fund.id] = nav;
       }
     }
 
